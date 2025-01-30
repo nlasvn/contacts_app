@@ -9,6 +9,10 @@ import lustre/element/html
 import sqlight
 import wisp.{type Request, type Response}
 
+pub type Contact {
+  Contact(id: Int, first: String, last: String, phone: String, email: String)
+}
+
 pub fn contacts(req: Request, ctx: Context) -> Response {
   use <- wisp.require_method(req, Get)
   let contact_decoder = {
@@ -17,7 +21,7 @@ pub fn contacts(req: Request, ctx: Context) -> Response {
     use last <- decode.field(2, decode.string)
     use phone <- decode.field(3, decode.string)
     use email <- decode.field(4, decode.string)
-    decode.success(#(id, first, last, phone, email))
+    decode.success(Contact(id:, first:, last:, phone:, email:))
   }
 
   let sql = "select * from contacts"
@@ -33,15 +37,15 @@ pub fn contacts(req: Request, ctx: Context) -> Response {
         html.li([], [
           element.text(
             "ID is: "
-            <> int.to_string(contact.0)
+            <> int.to_string(contact.id)
             <> " First name is: "
-            <> contact.1
+            <> contact.first
             <> " Lastname is: "
-            <> contact.2
+            <> contact.last
             <> " Phone number is: "
-            <> contact.3
+            <> contact.phone
             <> " Email is: "
-            <> contact.4,
+            <> contact.email,
           ),
         ])
       })
