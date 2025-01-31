@@ -14,7 +14,7 @@ pub type Contact {
 }
 
 pub fn contacts(req: Request, ctx: Context) -> Response {
-  use <- wisp.require_method(req, Get)
+  //use <- wisp.require_method(req, Get)
   let contact_decoder = {
     use id <- decode.field(0, decode.int)
     use first <- decode.field(1, decode.string)
@@ -24,13 +24,31 @@ pub fn contacts(req: Request, ctx: Context) -> Response {
     decode.success(Contact(id:, first:, last:, phone:, email:))
   }
 
-  let sql = "select * from contacts"
+  let query = wisp.get_query(req) |> list.key_find("q")
 
-  let query_result =
-    sqlight.query(sql, on: ctx.db, with: [], expecting: contact_decoder)
+  let sql_all = "select * from contacts"
+
+  let sql_select =
+    "select * from contacts 
+    where first like ? OR last like ?"
+
+  let query_result = case query {
+    Ok(value) ->
+      sqlight.query(
+        sql_select,
+        on: ctx.db,
+        with: [
+          sqlight.text("%" <> value <> "%"),
+          sqlight.text("%" <> value <> "%"),
+        ],
+        expecting: contact_decoder,
+      )
+    Error(_) ->
+      sqlight.query(sql_all, on: ctx.db, with: [], expecting: contact_decoder)
+  }
 
   let contacts_result = case query_result {
-    Error(_) -> [html.text("Contact not found")]
+    Error(err) -> [html.text(err.message)]
     Ok(a) ->
       a
       |> list.map(fn(contact) {
@@ -52,7 +70,29 @@ pub fn contacts(req: Request, ctx: Context) -> Response {
   }
 
   let html =
-    html.header([], [html.ul([], contacts_result)])
+    html.body([], [
+      html.header([], [
+        html.h1([], [element.text("Contacts")]),
+        html.form(
+          [
+            attribute.action("/contacts"),
+            attribute.method("get"),
+            attribute.class("tool-bar"),
+          ],
+          [
+            html.label([attribute.for("search")], [element.text("Search Term ")]),
+            html.input([
+              attribute.id("search"),
+              attribute.type_("search"),
+              attribute.name("q"),
+              attribute.placeholder("Enter the search term"),
+            ]),
+            html.input([attribute.type_("submit"), attribute.value("Search")]),
+          ],
+        ),
+        html.ul([], contacts_result),
+      ]),
+    ])
     |> element.to_document_string_builder
 
   wisp.ok() |> wisp.html_body(html)
